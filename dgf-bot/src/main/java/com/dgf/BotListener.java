@@ -47,7 +47,16 @@ public class BotListener extends ListenerAdapter {
         } else if (isWaitingForTriviaSettings(event.getChannel().getIdLong())) {
                 processTriviaSettings(event, messageSent);
         }
-            
+        
+            // New code to handle trivia responses
+        long channelId = event.getChannel().getIdLong();
+        User user = event.getAuthor();
+        String messageContent = event.getMessage().getContentRaw();
+
+        if (ongoingGames.containsKey(channelId)) {
+        TriviaGame currentGame = ongoingGames.get(channelId);
+        currentGame.handleResponse(user, messageContent);
+        }
     }
 
     private void handleJokeCommand(GuildMessageReceivedEvent event, String message) {
@@ -214,54 +223,30 @@ public class BotListener extends ListenerAdapter {
             try {
                 String category = parts[0].trim();
                 int numberOfQuestions = Integer.parseInt(parts[1].trim());
-                startTriviaGame(event, category, numberOfQuestions);
+                
+                // Additional parameters
+                String difficulty = "medium"; // or extract from user input
+                String type = "multiple"; // or extract from user input
+    
+                List<TriviaQuestions> questions = TriviaService.getTriviaQuestions(category, numberOfQuestions, difficulty, type);
+                
+                if (questions == null || questions.isEmpty()) {
+                    event.getChannel().sendMessage("No trivia questions found for the specified settings.").queue();
+                    return;
+                }
+        
+                TriviaGame triviaGame = new TriviaGame(questions, event.getChannel());
+                ongoingGames.put(event.getChannel().getIdLong(), triviaGame);
+                triviaGame.start();
             } catch (NumberFormatException e) {
                 event.getChannel().sendMessage("Please enter a valid number format.").queue();
             }
         } else {
             event.getChannel().sendMessage("Invalid format. Please enter in the format: category,number").queue();
         }
-        String difficulty = "medium"; 
-        String type = "multiple";
-        // No token handling for simplicity, can be added as per requirement
-        List<TriviaQuestions> questions = TriviaService.getTriviaQuestions(category, numberOfQuestions, difficulty, type);
-
-        if (questions.isEmpty()) {
-            event.getChannel().sendMessage("No trivia questions found for the specified settings.").queue();
-            return;
-        }
-
-        TriviaGame triviaGame = new TriviaGame(questions, event.getChannel());
-        ongoingGames.put(channelId, triviaGame);
-        triviaGame.start();
-    }
-    
-    
-    private void startTriviaGame(GuildMessageReceivedEvent event, String category, int numberOfQuestions) {
-        long channelId = event.getChannel().getIdLong();
-        if (ongoingGames.containsKey(channelId)) {
-            event.getChannel().sendMessage("A trivia game is already ongoing in this channel.").queue();
-            return;
-        }
-
-        String difficulty = "medium"; // Example default value
-        String type = "multiple"; // Example default value
-        String token = ""; // Example default value
-        List<TriviaQuestions> questions = TriviaService.getTriviaQuestions(category, numberOfQuestions, difficulty, type, token);
-        
-        if (questions == null || questions.isEmpty()) {
-            event.getChannel().sendMessage("No trivia questions found for the specified settings.").queue();
-            return;
-        }
-    
-        TriviaGame triviaGame = new TriviaGame(questions, event.getChannel());
-        ongoingGames.put(channelId, triviaGame);
-        triviaGame.start();
     }
 
     private class TriviaGame {
-        private String category;
-        private int numberOfQuestions;
         private AtomicInteger currentQuestionIndex = new AtomicInteger(0);
         private MessageChannel channel;
         private List<TriviaQuestions> questions;
@@ -302,7 +287,14 @@ public class BotListener extends ListenerAdapter {
                 message.append((i + 1) + ". " + answers.get(i) + "\n");
             }
 
-            channel.sendMessage(message.toString()).queue();
+            String messageToSend = message.toString();
+            if (messageToSend != null) { // Null check added
+                channel.sendMessage(messageToSend).queue();
+            } else {
+                // Handle the unlikely case of message being null
+                System.out.println("Error: Message to send is null");
+            }
+
             scheduleQuestionTimeout();
         }
 
@@ -350,7 +342,13 @@ public class BotListener extends ListenerAdapter {
                     leaderboard.append(user.getName()).append(": ").append(points).append(" points\n");
             });
 
-            channel.sendMessage(leaderboard.toString()).queue();
+            String leaderboardMessage = leaderboard.toString();
+            if (leaderboardMessage != null) {
+                channel.sendMessage(leaderboardMessage).queue();
+            } else {
+                // Handle the unlikely case of leaderboard being null
+                System.out.println("Error: Leaderboard message is null");
+            }
             scores.clear(); // Clear scores for the next game
         }
 
