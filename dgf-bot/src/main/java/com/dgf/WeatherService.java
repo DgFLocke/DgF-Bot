@@ -9,6 +9,12 @@ import org.json.JSONObject;
 
 public class WeatherService {
     private static final String WEATHER_API_KEY = System.getenv("OPENWEATHER_API_KEY");
+    private static HttpClient httpClient = HttpClient.newHttpClient();
+
+    // Add this method to your WeatherService class
+    public static void setHttpClient(HttpClient client) {
+        WeatherService.httpClient = client;
+    }
 
     public static String getWeather(String city) {
         String url = "http://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=" + WEATHER_API_KEY + "&units=metric";
